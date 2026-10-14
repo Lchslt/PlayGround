@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='white' stroke='black' stroke-width='6'/><path d='M6 50 A44 44 0 0 1 94 50 Z' fill='%23ef4444'/><rect x='6' y='45' width='88' height='10' fill='black'/><circle cx='50' cy='50' r='14' fill='white' stroke='black' stroke-width='6'/></svg>">
+<title>Pocket Wilds 3D — Desktop Creature Adventure</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0b1020; font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
+  #game-canvas { position:fixed; inset:0; display:block; }
+  #vignette { position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,10,.45) 100%); z-index:5; }
+  /* HUD */
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; }
+  #topbar { position:absolute; top:14px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:flex-start; }
+  .pill { background:rgba(10,16,32,.78); border:1px solid rgba(255,255,255,.18); color:#fff; border-radius:14px; padding:10px 14px; backdrop-filter:blur(8px); box-shadow:0 6px 24px rgba(0,0,0,.35); }
+  #logo { font-weight:900; letter-spacing:.5px; font-size:18px; }
+  #logo span { color:#ffd93b; text-shadow:0 2px 0 #2a5db0, 0 0 18px rgba(255,217,59,.5); }
+  #logo small { display:block; font-weight:600; font-size:11px; opacity:.75; letter-spacing:2px; }
+  #stats { display:flex; gap:10px; }
+  .stat { text-align:center; min-width:86px; }
+  .stat b { font-size:20px; display:block; }
+  .stat i { font-style:normal; font-size:11px; opacity:.7; letter-spacing:1px; text-transform:uppercase; }
+  #party-bar { position:absolute; left:16px; bottom:16px; display:flex; gap:8px; pointer-events:auto; }
+  .party-slot { width:74px; background:rgba(10,16,32,.82); border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:8px 6px; text-align:center; color:#fff; cursor:pointer; transition:.15s; }
+  .party-slot.active { border-color:#ffd93b; box-shadow:0 0 0 2px #ffd93b, 0 6px 18px rgba(0,0,0,.4); transform:translateY(-3px); }
+  .party-slot.fainted { opacity:.45; filter:grayscale(1); }
+  .party-slot .dot { width:30px; height:30px; border-radius:50%; margin:0 auto 4px; box-shadow:inset -4px -6px 0 rgba(0,0,0,.25); }
+  .party-slot .nm { font-size:10px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .party-slot .hpmini { height:5px; background:#333; border-radius:3px; margin-top:4px; overflow:hidden; }
+  .party-slot .hpmini > div { height:100%; background:linear-gradient(90deg,#4ade80,#22c55e); }
+  #controls-hint { position:absolute; right:16px; bottom:16px; color:#dbe6ff; font-size:12px; line-height:1.7; text-align:right; }
+  #controls-hint kbd { background:#1e2a4a; border:1px solid #3b4f86; border-bottom-width:3px; border-radius:6px; padding:1px 7px; font-family:inherit; font-weight:700; color:#fff; }
+  #toast-wrap { position:absolute; top:84px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:8px; align-items:center; }
+  .toast { background:rgba(10,16,32,.9); color:#fff; border:1px solid rgba(255,217,59,.5); padding:10px 18px; border-radius:999px; font-size:14px; font-weight:600; animation:toastIn .3s ease; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  @keyframes toastIn { from{transform:translateY(-10px); opacity:0;} to{transform:none; opacity:1;} }
+  #encounter-flash { position:fixed; inset:0; background:radial-gradient(circle,#fff 0%,#ffd93b 30%,#111 75%); opacity:0; pointer-events:none; z-index:40; transition:opacity .12s; }
+  #minimap { position:absolute; right:16px; top:84px; width:168px; height:168px; border-radius:16px; border:2px solid rgba(255,255,255,.25); background:rgba(8,14,28,.8); box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  #objective { position:absolute; left:16px; top:84px; max-width:300px; font-size:13px; color:#eaf0ff; line-height:1.55; }
+  #objective b { color:#ffd93b; }
+  /* Title screen */
+  #title-screen { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:radial-gradient(1200px 700px at 50% 20%, #2a5db0 0%, #16265c 45%, #0b1020 100%); overflow:auto; padding:24px; }
+  #title-card { width:min(980px,96vw); background:rgba(255,255,255,.97); border-radius:24px; overflow:hidden; box-shadow:0 30px 100px rgba(0,0,0,.6); display:grid; grid-template-columns:1.05fr .95fr; }
+  #title-left { padding:34px 32px; }
+  #title-left h1 { font-size:44px; line-height:.95; font-weight:900; color:#1a2a6b; }
+  #title-left h1 span { color:#eab308; -webkit-text-stroke:2px #1a2a6b; text-shadow:3px 3px 0 #1a2a6b; }
+  #title-left p { color:#475569; margin:12px 0 16px; font-size:14.5px; line-height:1.6; }
+  .feature-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .feat { font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; background:#eef4ff; border:1px solid #c9d8ff; color:#27408f; padding:6px 10px; border-radius:999px; }
+  #starter-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:10px 0 14px; }
+  .starter { border:2px solid #e2e8f0; border-radius:16px; padding:12px 8px; text-align:center; cursor:pointer; transition:.15s; background:#fff; }
+  .starter:hover { transform:translateY(-3px); border-color:#93c5fd; box-shadow:0 10px 24px rgba(37,99,235,.18); }
+  .starter.selected { border-color:#eab308; box-shadow:0 0 0 3px #fde68a, 0 10px 24px rgba(0,0,0,.12); }
+  .starter .art { width:64px; height:64px; border-radius:50%; margin:0 auto 8px; box-shadow:inset -8px -10px 0 rgba(0,0,0,.18); }
+  .starter b { display:block; font-size:14px; color:#0f172a; }
+  .starter small { color:#64748b; font-size:11.5px; }
+  .type-badge { display:inline-block; font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; color:#fff; margin-top:6px; letter-spacing:.5px; }
+  #start-btn { width:100%; padding:14px; border:none; border-radius:14px; font-size:17px; font-weight:900; letter-spacing:.5px; color:#1a2a6b; background:linear-gradient(180deg,#ffe55e,#ffc93b); cursor:pointer; box-shadow:0 6px 0 #b98a00, 0 12px 30px rgba(0,0,0,.2); }
+  #start-btn:active { transform:translateY(3px); box-shadow:0 2px 0 #b98a00; }
+  #name-row { display:flex; gap:8px; margin-bottom:12px; }
+  #name-row input { flex:1; padding:11px 12px; border-radius:12px; border:2px solid #e2e8f0; font-size:14px; font-weight:600; outline:none; }
+  #name-row input:focus { border-color:#3b82f6; }
+  #title-right { background:linear-gradient(180deg,#87ce5b,#3d9b4f 60%,#2a7a3c); position:relative; min-height:420px; overflow:hidden; }
+  #title-right .sun { position:absolute; top:26px; right:30px; width:74px; height:74px; background:radial-gradient(circle,#fff8c9,#ffd93b); border-radius:50%; box-shadow:0 0 50px #ffec8a; }
+  .t-hill { position:absolute; bottom:-40px; border-radius:50%; }
+  .t-tree { position:absolute; }
+  #title-3d-note { position:absolute; bottom:12px; left:12px; right:12px; background:rgba(0,0,0,.55); color:#fff; font-size:12px; padding:10px 12px; border-radius:12px; line-height:1.5; backdrop-filter:blur(4px); }
+  /* Battle overlay */
+  #battle { position:fixed; inset:0; z-index:30; display:none; align-items:flex-end; justify-content:center; background:linear-gradient(180deg, rgba(5,8,20,.25) 0%, rgba(5,8,20,.72) 100%); padding:22px; }
+  #battle.open { display:flex; }
+  #battle-card { width:min(1020px,96vw); background:#f8fafc; border-radius:20px; overflow:hidden; box-shadow:0 30px 90px rgba(0,0,0,.55); border:4px solid #1e293b; }
+  #battle-top { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; padding:16px 18px 8px; align-items:center; background:linear-gradient(180deg,#dbeafe,#f8fafc); }
+  .fighter { background:#fff; border:2px solid #e2e8f0; border-radius:14px; padding:10px 12px; }
+  .fighter .fname { font-weight:900; color:#0f172a; font-size:16px; display:flex; justify-content:space-between; align-items:center; }
+  .fighter .lvl { font-size:12px; background:#0f172a; color:#ffd93b; padding:2px 8px; border-radius:999px; }
+  .hpbar { height:12px; background:#1e293b; border-radius:999px; margin-top:8px; overflow:hidden; border:1px solid #0f172a; }
+  .hpbar > div { height:100%; width:100%; background:linear-gradient(90deg,#4ade80,#16a34a); transition:width .5s ease; }
+  .hpbar.low > div { background:linear-gradient(90deg,#fbbf24,#f59e0b); }
+  .hpbar.crit > div { background:linear-gradient(90deg,#f87171,#dc2626); }
+  .fighter .meta { font-size:12px; color:#64748b; margin-top:6px; }
+  #vs { font-size:28px; font-weight:900; color:#dc2626; background:#fff; border:3px solid #0f172a; width:64px; height:64px; display:flex; align-items:center; justify-content:center; border-radius:50%; box-shadow:0 6px 0 #0f172a; }
+  #battle-log { margin:0 18px; background:#0f172a; color:#e2e8f0; border-radius:12px; padding:12px 14px; font-size:14px; min-height:52px; line-height:1.5; border:2px solid #334155; }
+  #battle-actions { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; padding:12px 18px 18px; }
+  .b-btn { border:none; border-radius:12px; padding:13px 8px; font-weight:900; font-size:14px; cursor:pointer; color:#fff; box-shadow:0 4px 0 rgba(0,0,0,.3); }
+  .b-btn:active { transform:translateY(2px); box-shadow:none; }
+  .b-btn:disabled { opacity:.5; cursor:default; }
+  #btn-fight { background:linear-gradient(180deg,#ef4444,#b91c1c); }
+  #btn-catch { background:linear-gradient(180deg,#3b82f6,#1d4ed8); }
+  #btn-swap { background:linear-gradient(180deg,#8b5cf6,#6d28d9); }
+  #btn-run { background:linear-gradient(180deg,#64748b,#334155); }
+  #move-row { display:none; grid-template-columns:1fr 1fr; gap:10px; padding:0 18px 18px; }
+  #move-row.open { display:grid; }
+  .move-btn { text-align:left; background:#fff; border:2px solid #cbd5e1; border-radius:12px; padding:10px 12px; cursor:pointer; }
+  .move-btn:hover { border-color:#3b82f6; }
+  .move-btn b { display:block; color:#0f172a; }
+  .move-btn small { color:#64748b; }
+  /* dex */
+  #dex { position:fixed; right:16px; top:264px; width:168px; z-index:10; pointer-events:auto; }
+  #dex .pill { font-size:12px; line-height:1.6; }
+  #dex button { pointer-events:auto; width:100%; margin-top:8px; border:none; background:#ffd93b; color:#1a2a6b; font-weight:900; border-radius:10px; padding:9px; cursor:pointer; box-shadow:0 3px 0 #b98a00; }
+  #big-dex { position:fixed; inset:0; z-index:45; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:20px; }
+  #big-dex.open { display:flex; }
+  #big-dex-card { width:min(760px,94vw); max-height:86vh; overflow:auto; background:#fff; border-radius:18px; padding:18px; }
+  #big-dex-card h2 { color:#0f172a; }
+  #dex-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:12px; }
+  .dex-entry { border:2px solid #e2e8f0; border-radius:12px; padding:10px; text-align:center; }
+  .dex-entry.caught { border-color:#22c55e; background:#f0fdf4; }
+  .dex-entry .art { width:52px; height:52px; border-radius:50%; margin:0 auto 6px; }
+  .dex-entry b { font-size:13px; }
+  .dex-entry small { color:#64748b; font-size:11px; display:block; }
+  #loading { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; background:#0b1020; color:#fff; font-weight:800; letter-spacing:1px; }
+  #ball-anim { position:fixed; left:50%; top:38%; width:46px; height:46px; margin-left:-23px; z-index:35; display:none; }
+  @media (max-width:900px){ #title-card{grid-template-columns:1fr;} #title-right{min-height:220px;} #objective{display:none;} #controls-hint{display:none;} #battle-actions{grid-template-columns:1fr 1fr;} }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="loading">LOADING POCKET WILDS 3D…</div>
+<canvas id="game-canvas"></canvas>
+<div id="vignette"></div>
+
+<div id="hud">
+  <div id="topbar">
+    <div class="pill" id="logo">🌿 POCKET <span>WILDS</span> 3D <small>DESKTOP EDITION • FAN-MADE CREATURE ADVENTURE</small></div>
+    <div id="stats">
+      <div class="pill stat"><b id="st-balls">10</b><i>Capsules</i></div>
+      <div class="pill stat"><b id="st-caught">0/8</b><i>Dex</i></div>
+      <div class="pill stat"><b id="st-badges">0</b><i>Wins</i></div>
+    </div>
+  </div>
+  <div class="pill" id="objective">👋 <b id="obj-trainer">Trainer</b>, explore the meadow!<br>• Walk into <b>tall grass</b> to find wildlings<br>• <b>Heal</b> at the blue Crystal Center<br>• Catch <b>all 8</b> to become Wild Master</div>
+  <canvas id="minimap" width="168" height="168"></canvas>
+  <div id="dex"><div class="pill">📖 <b>Field Dex</b><div id="dex-mini">No sightings yet.</div><button id="open-dex">OPEN DEX (J)</button></div></div>
+  <div id="party-bar"></div>
+  <div id="controls-hint">
+    <kbd>W A S D</kbd> move &nbsp; <kbd>Shift</kbd> run &nbsp; <kbd>Space</kbd> hop<br>
+    drag <b>mouse</b> to orbit • wheel to zoom<br>
+    <kbd>E</kbd> interact / talk &nbsp; <kbd>J</kbd> dex &nbsp; <kbd>H</kbd> heal
+  </div>
+  <div id="toast-wrap"></div>
+</div>
+<div id="encounter-flash"></div>
+<svg id="ball-anim" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="#f8fafc" stroke="#0f172a" stroke-width="6"/><path d="M6 50 A44 44 0 0 1 94 50 Z" fill="#ef4444"/><rect x="6" y="45" width="88" height="10" fill="#0f172a"/><circle cx="50" cy="50" r="14" fill="#fff" stroke="#0f172a" stroke-width="6"/><circle cx="50" cy="50" r="5" fill="#cbd5e1"/></svg>
+
+<div id="battle">
+  <div id="battle-card">
+    <div id="battle-top">
+      <div class="fighter"><div class="fname"><span id="bf-ally-name">—</span><span class="lvl" id="bf-ally-lvl">Lv 5</span></div><div class="hpbar" id="bf-ally-bar"><div></div></div><div class="meta" id="bf-ally-meta">HP 20/20</div></div>
+      <div id="vs">VS</div>
+      <div class="fighter"><div class="fname"><span id="bf-foe-name">—</span><span class="lvl" id="bf-foe-lvl">Lv 3</span></div><div class="hpbar" id="bf-foe-bar"><div></div></div><div class="meta" id="bf-foe-meta">Wild • HP ?</div></div>
+    </div>
+    <div id="battle-log">A wild creature appeared!</div>
+    <div id="battle-actions">
+      <button class="b-btn" id="btn-fight">⚔️ FIGHT</button>
+      <button class="b-btn" id="btn-catch">🔵 CATCH</button>
+      <button class="b-btn" id="btn-swap">🔄 SWAP</button>
+      <button class="b-btn" id="btn-run">🏃 RUN</button>
+    </div>
+    <div id="move-row"></div>
+  </div>
+</div>
+
+<div id="big-dex"><div id="big-dex-card"><h2>📖 Creature Dex <button id="close-dex" style="float:right;padding:8px 14px;border-radius:10px;border:none;background:#0f172a;color:#fff;font-weight:800;cursor:pointer;">CLOSE</button></h2><p style="color:#64748b;font-size:13px;">An original fan-made field guide. Not affiliated with Nintendo / Pokémon.</p><div id="dex-grid"></div></div></div>
+
+<div id="title-screen">
+  <div id="title-card">
+    <div id="title-left">
+      <div class="feature-row"><span class="feat">🖥️ Desktop 3D</span><span class="feat">🌿 Open meadow</span><span class="feat">⚔️ Turn battles</span><span class="feat">🔵 Catch 'em</span></div>
+      <h1>POCKET <span>WILDS</span> 3D</h1>
+      <p>A <b>Pokémon-inspired</b> desktop adventure with 100% original creatures. Run through tall grass, battle wildlings in turn-based combat, weaken them, and throw capture capsules. Heal at the Crystal Center. Catch all <b>8 species</b>!</p>
+      <div id="name-row"><input id="trainer-name" maxlength="12" placeholder="Trainer name… (e.g. Ash)" value="Trainer"></div>
+      <b style="font-size:13px;color:#0f172a;">CHOOSE YOUR STARTER:</b>
+      <div id="starter-grid"></div>
+      <button id="start-btn">▶ START ADVENTURE</button>
+      <p style="font-size:11.5px;margin-top:10px;">🖱️ WASD + mouse • Fan game — all creatures & art are procedurally generated originals.</p>
+    </div>
+    <div id="title-right"><div class="sun"></div><div id="title-deco"></div><div id="title-3d-note">✨ Full 3D meadow renders behind this menu once you start — trees, pond, wildlings roaming, day light + soft shadows. Best on desktop Chrome/Edge.</div></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ================= DATA — 8 original creatures ================= */
+const TYPES = { Leaf:'#3fa34d', Ember:'#e4572e', Aqua:'#2e86e4', Volt:'#eab308', Gale:'#7dd3fc', Rock:'#8b7d6b', Frost:'#67e8f9', Shade:'#6d28d9' };
+const CHART = { Ember:{Leaf:2,Frost:2,Ember:.5,Aqua:.5,Rock:.5}, Aqua:{Ember:2,Rock:2,Leaf:.5,Aqua:.5}, Leaf:{Aqua:2,Rock:2,Ember:.5,Gale:.5}, Volt:{Aqua:2,Gale:2,Leaf:.5,Volt:.5}, Gale:{Leaf:2,Ember:.5,Rock:.5}, Rock:{Ember:2,Volt:2,Gale:2,Leaf:.5}, Frost:{Leaf:2,Gale:2,Ember:.5}, Shade:{Shade:2,Frost:1.2} };
+function effOf(moveType, targetType){ return (CHART[moveType] && CHART[moveType][targetType]) || 1; }
+
+const SPECIES = [
+  { id:'embercub', name:'Embercub', type:'Ember', color:0xe4572e, belly:0xffd9a0, shape:'cub', desc:'A brave fire-cub. Its tail-tip glows when happy.', baseHp:24, atk:7, def:4, spd:6, moves:[{n:'Tackle',p:8,t:'Normal'},{n:'Ember Fang',p:12,t:'Ember'}], catchRate:.55 },
+  { id:'aquafin', name:'Aquafin', type:'Aqua', color:0x2e86e4, belly:0xcfeaff, shape:'fish', desc:'Loves ponds. Blows bubble rings to play.', baseHp:26, atk:6, def:6, spd:5, moves:[{n:'Tackle',p:8,t:'Normal'},{n:'Bubble Pop',p:12,t:'Aqua'}], catchRate:.55 },
+  { id:'leafrog', name:'Leafrog', type:'Leaf', color:0x3fa34d, belly:0xd9f5c0, shape:'frog', desc:'Croaks in the rain. Leaf on head photosynthesizes.', baseHp:28, atk:6, def:5, spd:4, moves:[{n:'Tackle',p:8,t:'Normal'},{n:'Vine Slap',p:12,t:'Leaf'}], catchRate:.55 },
+  { id:'voltpup', name:'Voltpup', type:'Volt', color:0xf2b705, belly:0xfff6bf, shape:'pup', desc:'Static ears crackle before a storm.', baseHp:22, atk:8, def:3, spd:9, moves:[{n:'Quick Nip',p:9,t:'Normal'},{n:'Zap Bark',p:12,t:'Volt'}], catchRate:.5 },
+  { id:'galehoot', name:'Galehoot', type:'Gale', color:0x9ad6ff, belly:0xffffff, shape:'owl', desc:'Silent wings. Can hover without flapping.', baseHp:23, atk:6, def:4, spd:8, moves:[{n:'Peck',p:9,t:'Normal'},{n:'Gust Wing',p:12,t:'Gale'}], catchRate:.5 },
+  { id:'rockmole', name:'Rockmole', type:'Rock', color:0x8b7d6b, belly:0xe8dcc8, shape:'mole', desc:'Eats pebbles. Nose hard as granite.', baseHp:32, atk:7, def:8, spd:2, moves:[{n:'Tackle',p:8,t:'Normal'},{n:'Pebble Toss',p:13,t:'Rock'}], catchRate:.45 },
+  { id:'frostnip', name:'Frostnip', type:'Frost', color:0x7de8f0, belly:0xffffff, shape:'fox', desc:'Rare. Leaves frosty pawprints.', baseHp:24, atk:8, def:4, spd:7, moves:[{n:'Scratch',p:9,t:'Normal'},{n:'Ice Shard',p:13,t:'Frost'}], catchRate:.35 },
+  { id:'shademoth', name:'Shademoth', type:'Shade', color:0x6d28d9, belly:0xd8b4fe, shape:'moth', desc:'Mythic night-moth. Dust causes drowsy dreams.', baseHp:26, atk:9, def:5, spd:7, moves:[{n:'Scratch',p:9,t:'Normal'},{n:'Night Dust',p:14,t:'Shade'}], catchRate:.28 },
+];
+const byId = id => SPECIES.find(s=>s.id===id);
+
+/* ================= STATE ================= */
+const state = {
+  started:false, inBattle:false, dexOpen:false,
+  trainer:'Trainer', party:[], balls:10, wins:0, seen:{}, caught:{},
+  activeIndex:0, foe:null, foeHp:0, foeMax:0, foeLvl:3, turnLock:false,
+  camYaw:0.6, camDist:9, camPitch:0.42,
+  keys:{}, encounterCd:0, healCd:0,
+};
+function mkMon(speciesId, level){
+  const s = byId(speciesId);
+  const max = Math.round(s.baseHp + level*3.2);
+  return { speciesId, name:s.name, type:s.type, level, xp:0, maxHp:max, hp:max, moves:s.moves.map(m=>({...m})) };
+}
+function xpNeed(level){ return level*14; }
+
+/* ================= THREE SETUP ================= */
+const canvas = document.getElementById('game-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87c5eb);
+scene.fog = new THREE.Fog(0x87c5eb, 60, 220);
+const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, .1, 600);
+const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x4a7c3a, .95); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3d6, 1.9);
+sun.position.set(40,60,25); sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-90; sun.shadow.camera.right=90; sun.shadow.camera.top=90; sun.shadow.camera.bottom=-90;
+scene.add(sun);
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+/* ---- world ---- */
+const WORLD_R = 95;
+const groundMat = new THREE.MeshStandardMaterial({ color:0x62b34e, roughness:1 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(260,260,1,1), groundMat);
+ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+// dirt paths
+function dirtPath(x,z,w,l,rot=0){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w,l), new THREE.MeshStandardMaterial({color:0xd9b77c,roughness:1}));
+  m.rotation.x=-Math.PI/2; m.rotation.z=rot; m.position.set(x,.02,z); m.receiveShadow=true; scene.add(m);
+}
+dirtPath(0,0,8,190); dirtPath(0,0,190,8);
+// pond
+const pond = new THREE.Mesh(new THREE.CircleGeometry(14,40), new THREE.MeshStandardMaterial({color:0x3aa7e0,roughness:.25,metalness:.1}));
+pond.rotation.x=-Math.PI/2; pond.position.set(-42,.03,38); scene.add(pond);
+const sand = new THREE.Mesh(new THREE.RingGeometry(14,17,40), new THREE.MeshStandardMaterial({color:0xe9d8a6,roughness:1}));
+sand.rotation.x=-Math.PI/2; sand.position.set(-42,.025,38); scene.add(sand);
+// tall grass zones
+const grassZones = [];
+const grassMat = new THREE.MeshStandardMaterial({color:0x2f8f3a,roughness:1});
+const grassBladeMat = new THREE.MeshStandardMaterial({color:0x37a344,roughness:1});
+function grassPatch(x,z,w,d){
+  grassZones.push({x,z,w,d});
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(w,d), grassMat);
+  base.rotation.x=-Math.PI/2; base.position.set(x,.04,z); base.receiveShadow=true; scene.add(base);
+  const g = new THREE.ConeGeometry(.16,.9,5);
+  for(let i=0;i<Math.min(220,w*d*1.2);i++){
+    const b = new THREE.Mesh(g, grassBladeMat);
+    b.position.set(x+(Math.random()-.5)*w, .4, z+(Math.random()-.5)*d);
+    b.rotation.y = Math.random()*Math.PI; b.castShadow=false; scene.add(b);
+  }
+}
+grassPatch(-30,-30,34,26); grassPatch(32,-28,36,26); grassPatch(-28, -2, 24, 18);
+grassPatch(30,30,40,28); grassPatch(-55,5,22,30); grassPatch(55,-5,24,24); grassPatch(0,-58,60,22);
+// trees / rocks / flowers
+function tree(x,z,s=1){
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.5*s,.7*s,3.4*s,8), new THREE.MeshStandardMaterial({color:0x7a5230,roughness:1}));
+  trunk.position.y=1.7*s; trunk.castShadow=true; g.add(trunk);
+  const c1 = new THREE.Mesh(new THREE.ConeGeometry(3*s,4.5*s,9), new THREE.MeshStandardMaterial({color:0x2e7d3f,roughness:1}));
+  c1.position.y=5*s; c1.castShadow=true; g.add(c1);
+  const c2 = new THREE.Mesh(new THREE.ConeGeometry(2.2*s,3.4*s,9), new THREE.MeshStandardMaterial({color:0x35964a,roughness:1}));
+  c2.position.y=7.2*s; c2.castShadow=true; g.add(c2);
+  g.position.set(x,0,z); g.rotation.y=Math.random()*6; scene.add(g);
+}
+function rock(x,z,s=1){
+  const r = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2*s,0), new THREE.MeshStandardMaterial({color:0x9aa3ad,roughness:1,flatShading:true}));
+  r.position.set(x,.6*s,z); r.castShadow=true; r.rotation.set(Math.random(),Math.random(),Math.random()); scene.add(r);
+}
+function flowers(x,z,n=10){
+  for(let i=0;i<n;i++){
+    const c = [0xff6b9d,0xffffff,0xffd93b,0xc084fc][i%4];
+    const f = new THREE.Mesh(new THREE.SphereGeometry(.22,8,8), new THREE.MeshStandardMaterial({color:c}));
+    f.position.set(x+(Math.random()-.5)*10,.3,z+(Math.random()-.5)*10); scene.add(f);
+    const st = new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.6), new THREE.MeshStandardMaterial({color:0x2e7d3f}));
+    st.position.set(f.position.x,.15,f.position.z); scene.add(st);
+  }
+}
+for(let i=0;i<46;i++){ const a=Math.random()*Math.PI*2, r=60+Math.random()*38; tree(Math.cos(a)*r, Math.sin(a)*r, .8+Math.random()*.9); }
+for(let i=0;i<12;i++){ const x=(Math.random()-.5)*170, z=(Math.random()-.5)*170; if(Math.hypot(x,z-10)<16) continue; tree(x,z,.7+Math.random()*.6); }
+for(let i=0;i<22;i++){ rock((Math.random()-.5)*180,(Math.random()-.5)*180,.5+Math.random()); }
+flowers(10,10); flowers(-20,20); flowers(40,-10); flowers(-40,-50);
+// fence around world
+(function fence(){
+  const mat = new THREE.MeshStandardMaterial({color:0x8b5e34,roughness:1});
+  for(let x=-WORLD_R;x<=WORLD_R;x+=6){
+    for(const z of [-WORLD_R,WORLD_R]){
+      const p = new THREE.Mesh(new THREE.BoxGeometry(.5,2,.5),mat); p.position.set(x,1,z); p.castShadow=true; scene.add(p);
+    }
+  }
+  for(let z=-WORLD_R;z<=WORLD_R;z+=6){
+    for(const x of [-WORLD_R,WORLD_R]){
+      const p = new THREE.Mesh(new THREE.BoxGeometry(.5,2,.5),mat); p.position.set(x,1,z); p.castShadow=true; scene.add(p);
+    }
+  }
+})();
+// Crystal Center (heal)
+const center = new THREE.Group();
+(function buildCenter(){
+  const base = new THREE.Mesh(new THREE.BoxGeometry(16,7,12), new THREE.MeshStandardMaterial({color:0xf1f5f9,roughness:.8}));
+  base.position.y=3.5; base.castShadow=true; center.add(base);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(11,5,4), new THREE.MeshStandardMaterial({color:0x2563eb,roughness:.7}));
+  roof.position.y=9.5; roof.rotation.y=Math.PI/4; roof.castShadow=true; center.add(roof);
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(3.4,4.6), new THREE.MeshStandardMaterial({color:0x0f172a}));
+  door.position.set(0,2.3,6.05); center.add(door);
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(1.1,20,20), new THREE.MeshStandardMaterial({color:0x67e8f9,emissive:0x0ea5e9,emissiveIntensity:.9}));
+  globe.position.y=13; center.add(globe); center.userData.globe=globe;
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(3.2,28), new THREE.MeshStandardMaterial({color:0x22d3ee,emissive:0x0ea5e9,emissiveIntensity:.5,transparent:true,opacity:.85}));
+  pad.rotation.x=-Math.PI/2; pad.position.set(0,.06,10); center.add(pad); center.userData.pad=pad;
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(8,1.6,.4), new THREE.MeshStandardMaterial({color:0x0f172a}));
+  sign.position.set(0,6.4,6.2); center.add(sign);
+  center.position.set(0,0,-78); scene.add(center);
+})();
+// clouds
+const clouds=[];
+for(let i=0;i<8;i++){
+  const c = new THREE.Group();
+  for(let j=0;j<3;j++){ const s=new THREE.Mesh(new THREE.SphereGeometry(3+Math.random()*3,12,12), new THREE.MeshStandardMaterial({color:0xffffff,roughness:1})); s.position.set(j*4-4,Math.random(),0); c.add(s); }
+  c.position.set((Math.random()-.5)*220,32+Math.random()*10,(Math.random()-.5)*220); scene.add(c); clouds.push(c);
+}
+// distant mountains
+for(let i=0;i<6;i++){
+  const m = new THREE.Mesh(new THREE.ConeGeometry(24+Math.random()*14,30+Math.random()*20,6), new THREE.MeshStandardMaterial({color:0x6b8cae,flatShading:true}));
+  const a = i/6*Math.PI*2; m.position.set(Math.cos(a)*170,12,Math.sin(a)*170); scene.add(m);
+}
+
+/* ---- player trainer ---- */
+function buildTrainer(){
+  const g = new THREE.Group();
+  const skin=0xffd9b3, shirt=0xe11d48, pants=0x1e3a8a;
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(.62,1,0.62), new THREE.MeshStandardMaterial({color:pants})); legs.position.y=.5; g.add(legs);
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(.26,.95,.3), new THREE.MeshStandardMaterial({color:pants})); legL.position.set(-.17,.5,.02); g.add(legL);
+  const legR = legL.clone(); legR.position.x=.17; g.add(legR);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(.9,1,0.55), new THREE.MeshStandardMaterial({color:shirt})); torso.position.y=1.5; torso.castShadow=true; g.add(torso);
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(.26,.9,.26), new THREE.MeshStandardMaterial({color:shirt})); armL.position.set(-.62,1.5,0); armL.castShadow=true; g.add(armL);
+  const armR = armL.clone(); armR.position.x=.62; g.add(armR);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.48,18,18), new THREE.MeshStandardMaterial({color:skin})); head.position.y=2.45; head.castShadow=true; g.add(head);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(.5,18,12,0,Math.PI*2,0,Math.PI/2.2), new THREE.MeshStandardMaterial({color:0xdc2626})); cap.position.y=2.55; g.add(cap);
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.1,16), new THREE.MeshStandardMaterial({color:0xdc2626})); brim.position.set(0,2.55,.35); g.add(brim);
+  const eyeM = new THREE.MeshBasicMaterial({color:0x111111});
+  for(const x of [-.17,.17]){ const e=new THREE.Mesh(new THREE.SphereGeometry(.07,8,8),eyeM); e.position.set(x,2.45,.44); g.add(e); }
+  g.userData={armL,armR,legL,legR,head};
+  g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
+  return g;
+}
+const player = buildTrainer(); player.position.set(0,0,10); scene.add(player);
+let playerVelY=0, playerGrounded=true;
+
+/* ---- creature models (procedural, original) ---- */
+function mat(c){ return new THREE.MeshStandardMaterial({color:c,roughness:.75}); }
+function buildCreatureMesh(speciesId){
+  const s = byId(speciesId); const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1,20,20), mat(s.color));
+  body.scale.set(1,0.95,1.15); body.position.y=1.05; body.castShadow=true; g.add(body);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(.72,16,16), mat(s.belly));
+  belly.scale.set(.85,.8,.7); belly.position.set(0,.85,.62); g.add(belly);
+  const eyeM = new THREE.MeshBasicMaterial({color:0x101828});
+  const eL = new THREE.Mesh(new THREE.SphereGeometry(.16,10,10),eyeM); eL.position.set(-.38,1.45,.82); g.add(eL);
+  const eR = eL.clone(); eR.position.x=.38; g.add(eR);
+  const glint = new THREE.MeshBasicMaterial({color:0xffffff});
+  for(const x of [-.34,.42]){ const gl=new THREE.Mesh(new THREE.SphereGeometry(.05,6,6),glint); gl.position.set(x,1.52,.95); g.add(gl); }
+  const addEar=(x,Geom,color)=>{ const e=new THREE.Mesh(Geom,mat(color??s.color)); e.position.set(x,2.1,0); e.castShadow=true; g.add(e); return e; };
+  if(s.shape==='cub'||s.shape==='pup'||s.shape==='fox'){
+    addEar(-.55,new THREE.ConeGeometry(.34,.9,8)); addEar(.55,new THREE.ConeGeometry(.34,.9,8));
+    const tail=new THREE.Mesh(new THREE.CylinderGeometry(.16,.28,1.4,8),mat(s.shape==='fox'?0xffffff:s.belly));
+    tail.position.set(0,1.1,-1.25); tail.rotation.x=1.1; g.add(tail); g.userData.tail=tail;
+    if(s.type==='Ember'){ const fl=new THREE.Mesh(new THREE.ConeGeometry(.22,.6,8),new THREE.MeshStandardMaterial({color:0xffb300,emissive:0xff6a00,emissiveIntensity:1})); fl.position.set(0,1.5,-1.9); g.add(fl); g.userData.flame=fl; }
+  } else if(s.shape==='frog'){
+    for(const x of [-.5,.5]){ const b=new THREE.Mesh(new THREE.SphereGeometry(.32,12,12),mat(s.color)); b.position.set(x,2,0); g.add(b);
+      const w=new THREE.Mesh(new THREE.SphereGeometry(.14,8,8),new THREE.MeshBasicMaterial({color:0xfff})); w.position.set(x,2.1,.24); g.add(w); }
+    const leaf=new THREE.Mesh(new THREE.SphereGeometry(.4,10,10),mat(0x65d62e)); leaf.scale.set(1,.25,1); leaf.position.set(0,2.25,-.1); g.add(leaf);
+  } else if(s.shape==='fish'){
+    const fin=new THREE.Mesh(new THREE.ConeGeometry(.5,1,4),mat(s.belly)); fin.position.set(0,2.2,-.2); fin.rotation.y=Math.PI/4; g.add(fin);
+    const tail=new THREE.Mesh(new THREE.ConeGeometry(.55,1.1,3),mat(s.belly)); tail.position.set(0,1,-1.4); tail.rotation.x=-1.4; g.add(tail); g.userData.tail=tail;
+  } else if(s.shape==='owl'||s.shape==='moth'){
+    const wgeo=new THREE.SphereGeometry(.9,12,12);
+    const wL=new THREE.Mesh(wgeo,mat(s.shape==='moth'?0x8b5cf6:s.belly)); wL.scale.set(.25,.7,1); wL.position.set(-1.1,1.3,-.2); g.add(wL);
+    const wR=wL.clone(); wR.position.x=1.1; g.add(wR); g.userData.wings=[wL,wR];
+    if(s.shape==='owl'){ const beak=new THREE.Mesh(new THREE.ConeGeometry(.18,.4,8),mat(0xf59e0b)); beak.position.set(0,1.2,.95); beak.rotation.x=Math.PI/2; g.add(beak); }
+    else { for(const x of [-.3,.3]){ const a=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,1),mat(0x333)); a.position.set(x,2.2,.2); a.rotation.z=x>0?-.4:.4; g.add(a);} }
+  } else if(s.shape==='mole'){
+    const nose=new THREE.Mesh(new THREE.SphereGeometry(.3,12,12),mat(0xf5c6a5)); nose.position.set(0,1.1,1.05); g.add(nose);
+    const hn=new THREE.Mesh(new THREE.ConeGeometry(.32,.7,8),mat(0x6b5d4f)); hn.position.set(0,1.5,-.3); hn.rotation.x=-.4; g.add(hn);
+  }
+  // feet
+  for(const x of [-.45,.45]){ const f=new THREE.Mesh(new THREE.SphereGeometry(.28,10,10),mat(s.belly)); f.position.set(x,.28,.25); f.scale.set(1,.6,1.3); g.add(f); }
+  // level ring
+  const ring=new THREE.Mesh(new THREE.RingGeometry(1.15,1.4,28), new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.75,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2; ring.position.y=.05; g.add(ring);
+  g.userData.ring=ring; g.userData.body=body;
+  return g;
+}
+
+/* ---- wild spawns ---- */
+const wilds = [];
+function spawnWild(speciesId, x, z, level){
+  const s = byId(speciesId || SPECIES[Math.floor(Math.random()*SPECIES.length)].id);
+  level = level || (2+Math.floor(Math.random()*5));
+  const mesh = buildCreatureMesh(s.id);
+  mesh.position.set(x,z ? z : x, 0); mesh.position.set(x,0,z);
+  const lvlLabel = makeLabel(s.name+' Lv'+level, s.color);
+  lvlLabel.position.y = 3.1; mesh.add(lvlLabel);
+  scene.add(mesh);
+  const w = { species:s, level, mesh, hx:x, hz:z, tx:x, tz:z, t:Math.random()*5, hop:Math.random()*6, lvlLabel };
+  wilds.push(w); return w;
+}
+function makeLabel(text,color){
+  const c=document.createElement('canvas'); c.width=256; c.height=64;
+  const x=c.getContext('2d'); x.fillStyle='rgba(10,16,32,.85)'; x.beginPath(); x.roundRect(8,8,240,48,14); x.fill();
+  x.fillStyle='#fff'; x.font='bold 26px sans-serif'; x.textAlign='center'; x.fillText(text,128,42);
+  const t=new THREE.CanvasTexture(c); const m=new THREE.SpriteMaterial({map:t,depthTest:false});
+  const sp=new THREE.Sprite(m); sp.scale.set(4.4,1.1,1); return sp;
+}
+for(let i=0;i<15;i++){
+  const z = randomGrassPoint(); spawnWild(undefined, z.x, z.z);
+}
+function randomGrassPoint(){
+  const zn = grassZones[Math.floor(Math.random()*grassZones.length)];
+  return { x: zn.x+(Math.random()-.5)*zn.w*.9, z: zn.z+(Math.random()-.5)*zn.d*.9 };
+}
+// partner follower (starter, follows player after start)
+let follower=null, followerMon=null;
+
+/* ================= INPUT ================= */
+addEventListener('keydown', e=>{
+  state.keys[e.code]=true;
+  if(e.code==='Space') e.preventDefault();
+  if(e.code==='KeyJ') toggleDex();
+  if(e.code==='KeyH') tryHeal(true);
+  if(e.code==='KeyE') tryInteract();
+  if(e.code==='Escape'){ closeDex(); closeMoves(); }
+});
+addEventListener('keyup', e=>{ state.keys[e.code]=false; });
+let dragging=false,lx=0,ly=0;
+canvas.addEventListener('pointerdown', e=>{ dragging=true; lx=e.clientX; ly=e.clientY; });
+addEventListener('pointerup', ()=>dragging=false);
+addEventListener('pointermove', e=>{
+  if(!dragging||!state.started||state.inBattle) return;
+  state.camYaw -= (e.clientX-lx)*.005; state.camPitch += (e.clientY-ly)*.003;
+  state.camPitch = Math.max(.08,Math.min(1.2,state.camPitch));
+  lx=e.clientX; ly=e.clientY;
+});
+addEventListener('wheel', e=>{ if(!state.started) return; state.camDist=Math.max(5,Math.min(18,state.camDist+e.deltaY*.01)); },{passive:true});
+
+/* ================= UI helpers ================= */
+const $ = id => document.getElementById(id);
+function toast(msg, ms=2600){
+  const d=document.createElement('div'); d.className='toast'; d.textContent=msg;
+  $('toast-wrap').appendChild(d); setTimeout(()=>{ d.style.opacity='0'; setTimeout(()=>d.remove(),300); },ms);
+}
+function sfx(freq=440,dur=.12,type='square',vol=.06){
+  try{
+    const ctx = sfx.ctx || (sfx.ctx=new (window.AudioContext||window.webkitAudioContext)());
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type; o.frequency.value=freq; g.gain.value=vol;
+    o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+dur);
+  }catch{}
+}
+function cry(speciesId){ const h=[...speciesId].reduce((a,c)=>a+c.charCodeAt(0),0); sfx(300+(h%400),.18,'sawtooth',.05); setTimeout(()=>sfx(500+(h%300),.15,'square',.05),120); }
+
+/* ================= STARTER SELECT ================= */
+const starters=['embercub','aquafin','leafrog'];
+let chosen='embercub';
+function renderStarters(){
+  const grid=$('starter-grid'); grid.innerHTML='';
+  starters.forEach(id=>{
+    const s=byId(id);
+    const d=document.createElement('div'); d.className='starter'+(id===chosen?' selected':'');
+    d.innerHTML=`<div class="art" style="background:radial-gradient(circle at 35% 30%, #fff8, transparent 45%), #${s.color.toString(16).padStart(6,'0')}"></div><b>${s.name}</b><small>${s.desc}</small><br><span class="type-badge" style="background:${TYPES[s.type]}">${s.type.toUpperCase()}</span>`;
+    d.onclick=()=>{ chosen=id; sfx(660,.08); renderStarters(); };
+    grid.appendChild(d);
+  });
+}
+renderStarters();
+// deco trees on title card
+(function(){ const deco=$('title-deco'); let h=''; for(let i=0;i<9;i++){ const l=8+i*10; h+=`<div class="t-tree" style="left:${l}%;bottom:70px;">${i%2?'🌲':'🌳'}</div><div class="t-hill" style="left:${l-8}%;width:180px;height:120px;background:${i%2?'#2f8f3a':'#35964a'}"></div>`;} deco.innerHTML=h; })();
+
+$('start-btn').onclick=()=>{
+  state.trainer = ($('trainer-name').value||'Trainer').slice(0,12);
+  $('obj-trainer').textContent = state.trainer;
+  const lvl=5;
+  state.party=[mkMon(chosen,lvl)];
+  state.seen[chosen]=true;
+  // follower visual
+  followerMon = state.party[0];
+  follower = buildCreatureMesh(followerMon.speciesId);
+  scene.add(follower);
+  $('title-screen').style.display='none';
+  $('loading').style.display='none';
+  state.started=true;
+  refreshParty(); refreshTop(); renderDex();
+  toast(`Welcome, ${state.trainer}! ${followerMon.name} joined you!`,3200);
+  sfx(523,.12); setTimeout(()=>sfx(659,.12),130); setTimeout(()=>sfx(784,.2),260);
+  cry(chosen);
+};
+
+/* ================= PARTY / DEX UI ================= */
+function refreshParty(){
+  const bar=$('party-bar'); bar.innerHTML='';
+  state.party.forEach((m,i)=>{
+    const s=byId(m.speciesId);
+    const d=document.createElement('div'); d.className='party-slot'+(i===state.activeIndex?' active':'')+(m.hp<=0?' fainted':'');
+    d.innerHTML=`<div class="dot" style="background:#${s.color.toString(16).padStart(6,'0')}"></div><div class="nm">${m.name} Lv${m.level}</div><div class="hpmini"><div style="width:${100*m.hp/m.maxHp}%"></div></div>`;
+    d.title=`${m.name} ${m.hp}/${m.maxHp} HP`;
+    d.onclick=()=>{ if(state.inBattle) battleSwapMenu(); else if(m.hp>0){ state.activeIndex=i; followerSwap(); refreshParty(); toast(m.name+' will lead the way!'); } };
+    bar.appendChild(d);
+  });
+}
+function followerSwap(){
+  if(follower){ scene.remove(follower); }
+  const lead = state.party[state.activeIndex];
+  if(lead){ followerMon=lead; follower=buildCreatureMesh(lead.speciesId); scene.add(follower); }
+}
+function refreshTop(){
+  $('st-balls').textContent=state.balls;
+  $('st-caught').textContent=`${Object.keys(state.caught).length}/8`;
+  $('st-badges').textContent=state.wins;
+}
+function renderDex(){
+  const mini=$('dex-mini');
+  const seenN=Object.keys(state.seen).length, gotN=Object.keys(state.caught).length;
+  mini.innerHTML=`Seen <b>${seenN}</b> • Caught <b style="color:#4ade80">${gotN}</b>`;
+  const grid=$('dex-grid'); grid.innerHTML='';
+  SPECIES.forEach(s=>{
+    const seen=state.seen[s.id], got=state.caught[s.id];
+    const d=document.createElement('div'); d.className='dex-entry'+(got?' caught':'');
+    d.innerHTML=`<div class="art" style="background:${seen?'#'+s.color.toString(16).padStart(6,'0'):'#cbd5e1'}"></div><b>${seen?s.name:'???'}</b><small>${seen?s.type+' • '+s.desc:'Not yet spotted'}</small>`;
+    grid.appendChild(d);
+  });
+}
+function toggleDex(){ state.dexOpen?closeDex():openDex(); }
+function openDex(){ state.dexOpen=true; renderDex(); $('big-dex').classList.add('open'); }
+function closeDex(){ state.dexOpen=false; $('big-dex').classList.remove('open'); }
+$('open-dex').onclick=openDex; $('close-dex').onclick=closeDex;
+
+/* ================= HEAL / INTERACT ================= */
+function tryHeal(manual){
+  const d = Math.hypot(player.position.x-center.position.x, player.position.z-(center.position.z+10));
+  if(d<7){
+    if(state.healCd>0){ if(manual) toast('Crystals recharging…'); return; }
+    state.healCd=3;
+    state.party.forEach(m=>m.hp=m.maxHp);
+    state.balls+=2;
+    refreshParty(); refreshTop();
+    toast('💎 Healed! +2 capsules. Your team glows with health!');
+    sfx(523,.1,'sine',.08); setTimeout(()=>sfx(659,.1,'sine',.08),110); setTimeout(()=>sfx(784,.25,'sine',.08),220);
+    // heal burst
+    center.userData.pad.material.emissiveIntensity=2; setTimeout(()=>center.userData.pad.material.emissiveIntensity=.5,800);
+  } else if(manual) toast('Go to the blue Crystal Center (south, blue roof) to heal.');
+}
+function tryInteract(){
+  // talk to nearest wild outside battle -> dex info
+  let best=null,bd=1e9;
+  wilds.forEach(w=>{ const d=Math.hypot(player.position.x-w.mesh.position.x,player.position.z-w.mesh.position.z); if(d<bd){bd=d;best=w;} });
+  if(best&&bd<5&&!state.inBattle){ state.seen[best.species.id]=true; renderDex(); cry(best.species.id); toast(`🔍 ${best.species.name} — ${best.species.desc}`); }
+}
+
+/* ================= BATTLE ================= */
+function inGrass(x,z){ return grassZones.some(g=>Math.abs(x-g.x)<g.w/2&&Math.abs(z-g.z)<g.d/2); }
+function startBattle(wild){
+  if(state.inBattle) return;
+  const lead = state.party[state.activeIndex];
+  if(!lead||lead.hp<=0){ const nxt=state.party.findIndex(m=>m.hp>0); if(nxt<0){ toast('All your creatures fainted! Visit the Crystal Center!'); return; } state.activeIndex=nxt; }
+  state.inBattle=true; state.turnLock=false;
+  state.foe = wild; state.foeLvl = wild.level;
+  const s=wild.species; state.foeMax=Math.round(s.baseHp+wild.level*3.2); state.foeHp=state.foeMax;
+  state.seen[s.id]=true; renderDex();
+  // flash + camera punch
+  const fl=$('encounter-flash'); fl.style.opacity='1'; setTimeout(()=>fl.style.opacity='0',260);
+  cry(s.id); sfx(150,.4,'sawtooth',.07);
+  $('battle').classList.add('open'); closeMoves();
+  log(`A wild <b>${s.name} Lv${wild.level}</b> leapt out of the grass!`);
+  // hide wild mesh (it's now "in battle"), keep ref
+  wild.mesh.visible=false;
+  // position battle arena meshes near player for backdrop
+  placeBattleActors();
+  updateBattleUI();
+  toast(`⚔️ Wild ${s.name} appeared! Weaken it, then CATCH!`);
+}
+function placeBattleActors(){
+  // move foe mesh in front of camera-facing player for drama
+  const f = state.foe.mesh; f.visible=true;
+  const dir = new THREE.Vector3(Math.sin(state.camYaw),0,Math.cos(state.camYaw));
+  f.position.copy(player.position).addScaledVector(dir,6); f.position.y=0;
+  f.lookAt(player.position.x,0,player.position.z);
+  if(follower){ follower.position.copy(player.position).addScaledVector(dir,2.2); follower.position.y=0; }
+}
+function ally(){ return state.party[state.activeIndex]; }
+function log(html){ $('battle-log').innerHTML=html; }
+function updateBattleUI(){
+  const a=ally(), s=state.foe.species;
+  $('bf-ally-name').textContent=`${a.name}`;
+  $('bf-ally-lvl').textContent=`Lv ${a.level} • ${a.type}`;
+  $('bf-ally-meta').textContent=`HP ${Math.max(0,Math.round(a.hp))}/${a.maxHp} • XP ${a.xp}/${xpNeed(a.level)}`;
+  const ap=$('bf-ally-bar'); ap.firstElementChild.style.width=(100*a.hp/a.maxHp)+'%';
+  ap.className='hpbar'+(a.hp/a.maxHp<.25?' crit':a.hp/a.maxHp<.5?' low':'');
+  $('bf-foe-name').textContent=`${s.name} (wild)`;
+  $('bf-foe-lvl').textContent=`Lv ${state.foeLvl} • ${s.type}`;
+  $('bf-foe-meta').textContent=`Wild • ${s.desc}`;
+  const fp=$('bf-foe-bar'); fp.firstElementChild.style.width=(100*state.foeHp/state.foeMax)+'%';
+  fp.className='hpbar'+(state.foeHp/state.foeMax<.25?' crit':state.foeHp/state.foeMax<.5?' low':'');
+  $('btn-catch').textContent=`🔵 CATCH (${state.balls})`;
+  $('btn-catch').disabled = state.balls<=0;
+}
+function closeMoves(){ $('move-row').classList.remove('open'); $('move-row').innerHTML=''; }
+function battleSwapMenu(){
+  closeMoves();
+  const row=$('move-row'); row.classList.add('open'); row.innerHTML='';
+  state.party.forEach((m,i)=>{
+    if(i===state.activeIndex) return;
+    const b=document.createElement('button'); b.className='move-btn';
+    b.innerHTML=`<b>${m.name} Lv${m.level} ${m.hp<=0?'(fainted)':''}</b><small>HP ${Math.max(0,Math.round(m.hp))}/${m.maxHp} • ${m.type}</small>`;
+    b.disabled=m.hp<=0;
+    b.onclick=()=>{ if(state.turnLock) return; state.activeIndex=i; followerSwap(); refreshParty(); log(`Go, <b>${m.name}</b>!`); sfx(600,.1); updateBattleUI(); closeMoves(); foeTurn(); };
+    row.appendChild(b);
+  });
+  if(!row.children.length){ row.innerHTML='<div style="color:#64748b;font-size:13px;padding:6px;">No other creatures to swap to.</div>'; }
+}
+$('btn-fight').onclick=()=>{
+  if(state.turnLock||!state.inBattle) return;
+  closeMoves();
+  const a=ally(); const row=$('move-row'); row.classList.add('open'); row.innerHTML='';
+  a.moves.forEach(mv=>{
+    const b=document.createElement('button'); b.className='move-btn';
+    const eff=effOf(mv.t,state.foe.species.type);
+    b.innerHTML=`<b>${mv.n} ${eff>1?'🔥':eff<1?'💧':''}</b><small>Power ${mv.p} • ${mv.t} ${eff>1?'(super effective!)':eff<1?'(not very…)':''}</small>`;
+    b.onclick=()=>doPlayerMove(mv);
+    row.appendChild(b);
+  });
+};
+function dmgCalc(power, atkLvl, defLvl, eff){
+  return Math.max(1, Math.round((power + atkLvl*1.1 - defLvl*.6) * eff * (0.85+Math.random()*.3)));
+}
+function doPlayerMove(mv){
+  if(state.turnLock) return; state.turnLock=true; closeMoves();
+  const a=ally(), foe=state.foe.species;
+  const eff=effOf(mv.t,foe.type);
+  const atk = byId(a.speciesId).atk + a.level, def = foe.def + state.foeLvl;
+  const d = dmgCalc(mv.p, atk*.6, def*.4, eff);
+  state.foeHp=Math.max(0,state.foeHp-d);
+  // lunge anim
+  if(follower){ follower.position.y=.8; setTimeout(()=>follower&&(follower.position.y=0),180); }
+  sfx(220,.15,'square',.08); setTimeout(()=>sfx(180,.2,'sawtooth',.07),90);
+  log(`<b>${a.name}</b> used <b>${mv.n}</b>! ${eff>1?'<b style="color:#4ade80">Super effective!</b> ':eff<1?'<i>Not very effective…</i> ':''}Dealt ${d} damage!`);
+  updateBattleUI();
+  shakeMesh(state.foe.mesh);
+  setTimeout(()=>{
+    if(state.foeHp<=0) winBattle();
+    else foeTurn();
+  },900);
+}
+function foeTurn(){
+  setTimeout(()=>{
+    if(!state.inBattle) return;
+    const a=ally(), foe=state.foe.species;
+    const mv=foe.moves[Math.floor(Math.random()*foe.moves.length)];
+    const eff=effOf(mv.t,a.type);
+    const d=dmgCalc(mv.p, foe.atk*.6+state.foeLvl*.5, byId(a.speciesId).def*.4+a.level*.4, eff);
+    a.hp=Math.max(0,a.hp-d);
+    sfx(140,.2,'sawtooth',.08);
+    log(`Wild <b>${foe.name}</b> used <b>${mv.n}</b>! Your ${a.name} took ${d}!${a.hp<=0?' <b style="color:#f87171">'+a.name+' fainted!</b>':''}`);
+    updateBattleUI(); refreshParty();
+    shakeMesh(follower);
+    setTimeout(()=>{
+      if(a.hp<=0){
+        const nxt=state.party.findIndex(m=>m.hp>0);
+        if(nxt<0){ loseBattle(); return; }
+        state.activeIndex=nxt; followerSwap(); refreshParty();
+        log(`Go, <b>${ally().name}</b>!`);
+        updateBattleUI();
+      }
+      state.turnLock=false;
+    },800);
+  },700);
+}
+function shakeMesh(m){ if(!m) return; const x0=m.position.x; let n=0; const iv=setInterval(()=>{ m.position.x=x0+(Math.random()-.5)*.5; if(++n>6){clearInterval(iv); m.position.x=x0;} },40); }
+$('btn-catch').onclick=()=>{
+  if(state.turnLock||!state.inBattle) return;
+  if(state.balls<=0){ log('No capsules left! Visit the Crystal Center.'); return; }
+  state.turnLock=true; closeMoves();
+  state.balls--; refreshTop(); updateBattleUI();
+  const s=state.foe.species;
+  const hpFrac = 1 - (state.foeHp/state.foeMax);
+  let chance = s.catchRate*(0.35+0.65*hpFrac);
+  if(state.foeHp/state.foeMax<.25) chance+=.15;
+  chance = Math.min(.95,chance);
+  log(`You threw a capsule at <b>${s.name}</b>…`);
+  const ball=$('ball-anim'); ball.style.display='block';
+  try{ ball.animate([{transform:'translateY(-120px) scale(1)'},{transform:'translateY(0) scale(1.2)'}],{duration:450,easing:'ease-in'}); }catch{}
+  sfx(800,.1,'sine',.08); setTimeout(()=>sfx(400,.15,'sine',.08),400);
+  const rolled = Math.random()<chance;
+  const shakes = rolled?3:(chance>.55?2:1);
+  let i=0;
+  state.foe.mesh.visible=false;
+  const iv=setInterval(()=>{
+    sfx(500+i*80,.12,'sine',.08);
+    try{ ball.animate([{transform:'rotate(0)'},{transform:'rotate(24deg)'}],{duration:180}); }catch{}
+    if(++i>shakes){ clearInterval(iv); ball.style.display='none';
+      if(rolled) catchSuccess();
+      else { state.foe.mesh.visible=true; log(`Oh no! <b>${s.name}</b> broke free!`); state.turnLock=false; foeTurn(); }
+    }
+  },650);
+};
+function gainXp(mon, amount){
+  mon.xp += amount;
+  let ups=0;
+  while(mon.xp>=xpNeed(mon.level)){ mon.xp-=xpNeed(mon.level); mon.level++; ups++;
+    mon.maxHp=Math.round(byId(mon.speciesId).baseHp+mon.level*3.2); mon.hp=Math.min(mon.maxHp,mon.hp+Math.round(mon.maxHp*.35)); }
+  return ups;
+}
+function catchSuccess(){
+  const s=state.foe.species, lvl=state.foeLvl, wildRef=state.foe;
+  const isNew=!state.caught[s.id];
+  state.caught[s.id]=true; state.seen[s.id]=true;
+  sfx(660,.1,'sine',.07); setTimeout(()=>sfx(880,.15,'sine',.07),120); setTimeout(()=>sfx(1320,.25,'sine',.07),260);
+  // remove wild from world, respawn a new one later
+  scene.remove(wildRef.mesh);
+  const wi=wilds.indexOf(wildRef); if(wi>=0) wilds.splice(wi,1);
+  setTimeout(()=>{ const p=randomGrassPoint(); spawnWild(undefined,p.x,p.z,2+Math.floor(Math.random()*5)); },4000);
+  if(state.party.length<6){
+    const m=mkMon(s.id,lvl); state.party.push(m);
+    gainXp(ally(), 6);
+    log(`🎉 <b>Caught ${s.name} Lv${lvl}!</b> ${isNew?'New dex entry! ':''}It joined your party!`);
+    toast(`🎉 Caught ${s.name}! ${isNew?'(NEW!) ':''}(${Object.keys(state.caught).length}/8)`);
+  } else {
+    gainXp(ally(), 8);
+    log(`🎉 <b>Caught ${s.name} Lv${lvl}!</b> Party full — sent to storage (counts for dex!).`);
+    toast(`🎉 Caught ${s.name}! (storage)`);
+  }
+  cry(s.id); refreshParty(); refreshTop(); renderDex(); save();
+  setTimeout(()=>endBattle(true),2200);
+}
+function winBattle(){
+  const foe=state.foe.species, wildRef=state.foe;
+  state.wins++;
+  const xp=8+state.foeLvl*3;
+  const ups=gainXp(ally(),xp);
+  sfx(523,.12,'square',.07); setTimeout(()=>sfx(784,.2,'square',.07),140);
+  log(`💪 Wild <b>${foe.name}</b> was defeated! ${ally().name} gained ${xp} XP!${ups?` <b style="color:#4ade80">Level up! Now Lv${ally().level}!</b>`:''}`);
+  scene.remove(wildRef.mesh);
+  const wi=wilds.indexOf(wildRef); if(wi>=0) wilds.splice(wi,1);
+  setTimeout(()=>{ const p=randomGrassPoint(); spawnWild(undefined,p.x,p.z,2+Math.floor(Math.random()*5)); },4000);
+  refreshParty(); refreshTop(); save();
+  state.turnLock=true;
+  setTimeout(()=>endBattle(true),2200);
+}
+function loseBattle(){
+  log(`😵 Your whole party fainted! You scurry back to the Crystal Center…`);
+  sfx(200,.5,'sawtooth',.08);
+  state.turnLock=true;
+  setTimeout(()=>{
+    endBattle(false);
+    player.position.set(0,0,-60);
+    state.party.forEach(m=>m.hp=Math.max(1,Math.round(m.maxHp*.4)));
+    refreshParty();
+    toast('You were rescued! Party partially restored — visit the Center.');
+  },2200);
+}
+$('btn-run').onclick=()=>{
+  if(state.turnLock||!state.inBattle) return;
+  const foeSpd=state.foe.species.spd, mySpd=byId(ally().speciesId).spd+ally().level*.3;
+  if(Math.random()<.75+ (mySpd>foeSpd?.15:0)){ log('💨 Got away safely!'); sfx(900,.15,'sine',.06); state.turnLock=true; setTimeout(()=>endBattle(true,true),800); }
+  else { log(`Can't escape!`); foeTurn(); }
+};
+$('btn-swap').onclick=()=>{ if(!state.turnLock) battleSwapMenu(); };
+function endBattle(keepPos, fled){
+  $('battle').classList.remove('open'); closeMoves();
+  state.inBattle=false; state.turnLock=false; state.foe=null;
+  // restore foe mesh if fled (respawn it roaming nearby)
+  if(fled&&state.foe){}
+  // re-place follower behind player
+  if(follower){ follower.position.set(player.position.x-1.5,0,player.position.z-1.5); }
+  wilds.forEach(w=>{ if(w.mesh!==state.foe) w.mesh.visible=true; });
+  state.encounterCd=3;
+  refreshParty(); refreshTop();
+}
+// wild touch -> battle also possible by walking into creature
+function checkWildTouch(){
+  if(state.inBattle||!state.started) return;
+  for(const w of wilds){
+    const d=Math.hypot(player.position.x-w.mesh.position.x,player.position.z-w.mesh.position.z);
+    if(d<2.2){ startBattle(w); return; }
+  }
+}
+
+/* ================= SAVE ================= */
+function save(){
+  try{ localStorage.setItem('pocket-wilds-3d', JSON.stringify({trainer:state.trainer,party:state.party,balls:state.balls,wins:state.wins,caught:state.caught,seen:state.seen})); }catch{}
+}
+
+/* ================= MINIMAP ================= */
+const mm=$('minimap').getContext('2d');
+function drawMinimap(){
+  mm.clearRect(0,0,168,168);
+  mm.fillStyle='#1d3a24'; mm.fillRect(0,0,168,168);
+  const toMap=(x,z)=>[84+x/WORLD_R*80, 84+z/WORLD_R*80];
+  // grass
+  mm.fillStyle='#2f8f3a';
+  grassZones.forEach(g=>{ const [mx,mz]=toMap(g.x-g.w/2,g.z-g.d/2); mm.fillRect(mx,mz,g.w/WORLD_R*80*2,g.d/WORLD_R*80*2); });
+  // pond
+  mm.fillStyle='#3aa7e0'; mm.beginPath(); let [px,py]=toMap(-42,38); mm.arc(px,py,11,0,7); mm.fill();
+  // center
+  mm.fillStyle='#60a5fa'; let [cx,cy]=toMap(0,-78); mm.fillRect(cx-5,cy-5,10,10);
+  // wilds
+  mm.fillStyle='#ffd93b';
+  wilds.forEach(w=>{ const [mx,mz]=toMap(w.mesh.position.x,w.mesh.position.z); mm.beginPath(); mm.arc(mx,mz,2.5,0,7); mm.fill(); });
+  // player
+  const [mx,mz]=toMap(player.position.x,player.position.z);
+  mm.fillStyle='#fff'; mm.beginPath(); mm.arc(mx,mz,4.5,0,7); mm.fill();
+  mm.strokeStyle='#e11d48'; mm.lineWidth=2; mm.beginPath(); mm.arc(mx,mz,4.5,0,7); mm.stroke();
+  // facing
+  mm.strokeStyle='#fff'; mm.beginPath(); mm.moveTo(mx,mz); mm.lineTo(mx-Math.sin(state.camYaw)*-8, mz-Math.cos(state.camYaw)*-8); mm.stroke();
+}
+
+/* ================= MAIN LOOP ================= */
+const clock=new THREE.Clock();
+let walkPhase=0, idleT=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
+  // clouds drift
+  clouds.forEach((c,i)=>{ c.position.x+=dt*(1+i*.2); if(c.position.x>130)c.position.x=-130; });
+  if(center.userData.globe) center.userData.globe.rotation.y+=dt;
+  if(center.userData.pad) center.userData.pad.material.opacity=.65+Math.sin(t*3)*.2;
+  // wild wander
+  wilds.forEach(w=>{
+    w.t-=dt;
+    if(w.t<=0){ w.t=2+Math.random()*4; const p=randomGrassPoint(); w.tx=p.x; w.tz=p.z; }
+    const dx=w.tx-w.mesh.position.x, dz=w.tz-w.mesh.position.z, d=Math.hypot(dx,dz);
+    if(d>.5 && !(state.inBattle&&state.foe===w)){
+      const sp=2.2*dt;
+      w.mesh.position.x+=dx/d*Math.min(sp,d); w.mesh.position.z+=dz/d*Math.min(sp,d);
+      w.mesh.rotation.y=Math.atan2(dx,dz);
+      w.mesh.position.y=Math.abs(Math.sin(t*6+w.hop))*.25;
+    } else w.mesh.position.y*=0.9;
+    const u=w.mesh.userData;
+    if(u.tail) u.tail.rotation.z=Math.sin(t*3+w.hop)*.4;
+    if(u.wings){ u.wings[0].rotation.y=Math.sin(t*8)*.5; u.wings[1].rotation.y=-Math.sin(t*8)*.5; }
+    if(u.flame) u.flame.scale.setScalar(1+Math.sin(t*10)*.2);
+    if(w.lvlLabel) w.lvlLabel.position.y=3.1+Math.sin(t*2+w.hop)*.12;
+  });
+  // player movement
+  if(state.started&&!state.inBattle){
+    const run=(state.keys.ShiftLeft||state.keys.ShiftRight)?2:1;
+    const sp=8*run*dt;
+    // camera-relative
+    let fx=-Math.sin(state.camYaw), fz=-Math.cos(state.camYaw);
+    let rx=-Math.cos(state.camYaw), rz=Math.sin(state.camYaw);
+    let mx=0,mz=0;
+    if(state.keys.KeyW||state.keys.ArrowUp){mx+=fx;mz+=fz;}
+    if(state.keys.KeyS||state.keys.ArrowDown){mx-=fx;mz-=fz;}
+    if(state.keys.KeyA||state.keys.ArrowLeft){mx-=rx;mz-=rz;}
+    if(state.keys.KeyD||state.keys.ArrowRight){mx+=rx;mz+=rz;}
+    const ml=Math.hypot(mx,mz);
+    if(ml>0){
+      mx/=ml; mz/=ml;
+      player.position.x=Math.max(-WORLD_R+2,Math.min(WORLD_R-2,player.position.x+mx*sp));
+      player.position.z=Math.max(-WORLD_R+2,Math.min(WORLD_R-2,player.position.z+mx*0+mz*sp));
+      player.rotation.y=Math.atan2(mx,mz);
+      walkPhase+=dt*10*run;
+      idleT=0;
+      // grass rustle + encounter rolls
+      if(inGrass(player.position.x,player.position.z)){
+        state.encounterCd-=dt;
+        if(state.encounterCd<=0&&ml>0){
+          state.encounterCd=1.1;
+          if(Math.random()<(run>1?.34:.22)){
+            const p=randomGrassPoint();
+            // pick nearest wild to player for battle, or spawn fresh
+            let best=null,bd=1e9;
+            wilds.forEach(w=>{const d=Math.hypot(player.position.x-w.mesh.position.x,player.position.z-w.mesh.position.z); if(d<bd){bd=d;best=w;}});
+            if(!best||bd>60){ best=spawnWild(undefined,player.position.x+4,player.position.z+4,2+Math.floor(Math.random()*5)); }
+            startBattle(best);
+          }
+        }
+      } else state.encounterCd=Math.max(state.encounterCd-dt,0);
+      checkWildTouch();
+    } else idleT+=dt;
+    // hop
+    if(state.keys.Space&&playerGrounded){ playerVelY=5.2; playerGrounded=false; sfx(300,.08,'square',.03); }
+    const u=player.userData;
+    const sw=Math.sin(walkPhase)* (ml>0?.55:0);
+    u.armL.rotation.x=sw; u.armR.rotation.x=-sw; u.legL.rotation.x=-sw; u.legR.rotation.x=sw;
+    u.head.position.y=2.45+(ml>0?Math.abs(Math.sin(walkPhase))*.06:Math.sin(t*2)*.03);
+    tryHeal(false);
+    if(state.healCd>0)state.healCd-=dt;
+  }
+  // gravity
+  if(!playerGrounded||player.position.y>0){
+    playerVelY-=16*dt; player.position.y+=playerVelY*dt;
+    if(player.position.y<=0){player.position.y=0;playerGrounded=true;playerVelY=0;}
+  }
+  // follower AI
+  if(follower&&state.started){
+    const tx=player.position.x-Math.sin(player.rotation.y)*2.2, tz=player.position.z-Math.cos(player.rotation.y)*2.2;
+    const dx=tx-follower.position.x, dz=tz-follower.position.z, d=Math.hypot(dx,dz);
+    if(!state.inBattle){
+      if(d>.4){ follower.position.x+=dx/d*Math.min(d,9*dt); follower.position.z+=dz/d*Math.min(d,9*dt); follower.rotation.y=Math.atan2(dx,dz); }
+      follower.position.y=Math.abs(Math.sin(t*7))*.22*(d>.4?1:0);
+    } else {
+      follower.lookAt(state.foe?state.foe.mesh.position:player.position);
+      follower.position.y=Math.abs(Math.sin(t*4))*.15;
+    }
+    const fu=follower.userData;
+    if(fu.tail) fu.tail.rotation.z=Math.sin(t*3)*.4;
+    if(fu.wings){ fu.wings[0].rotation.y=Math.sin(t*8)*.5; fu.wings[1].rotation.y=-Math.sin(t*8)*.5; }
+  }
+  // camera follow
+  if(state.started){
+    const cx=player.position.x+Math.sin(state.camYaw)*Math.cos(state.camPitch)*state.camDist;
+    const cz=player.position.z+Math.cos(state.camYaw)*Math.cos(state.camPitch)*state.camDist;
+    const cy=player.position.y+2+Math.sin(state.camPitch)*state.camDist;
+    camera.position.lerp(new THREE.Vector3(cx,cy,cz),1-Math.pow(.001,dt));
+    camera.lookAt(player.position.x,player.position.y+2,player.position.z);
+  } else {
+    // title orbit backdrop
+    camera.position.set(Math.sin(t*.15)*40,16,Math.cos(t*.15)*40);
+    camera.lookAt(0,2,0);
+  }
+  drawMinimap();
+  renderer.render(scene,camera);
+}
+$('loading').style.display='none';
+animate();
+// debug / test hook
+window.pocketWilds = { state, wilds, player, startBattle, tryHeal };
+
+</script>
+</body>
+</html>
