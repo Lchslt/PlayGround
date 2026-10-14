@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Jaune Aventure 3D — Hommage non-officiel style Let's Go</title>
+<link rel="icon" href="favicon.svg" />
+<link rel="stylesheet" href="style.css" />
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- Écran titre -->
+<div id="title" class="panel">
+  <div class="title-inner">
+    <div class="kicker">HOMMAGE NON-OFFICIEL • 100% CRÉATURES ORIGINALES</div>
+    <h1><span class="jaune">JAUNE</span> AVENTURE 3D</h1>
+    <p class="sub">Un clin d'œil à Pokémon Jaune, réimaginé en 3D façon X/Y • Rubis Oméga • Let's Go.<br/>
+    Aucun asset Nintendo n'est repris : monstres, carte et musiques sont originaux.</p>
+    <div class="title-btns">
+      <button id="btnNew" class="big yellow">▶ Nouvelle aventure</button>
+      <button id="btnContinue" class="big ghost">Continuer</button>
+    </div>
+    <div class="controls-help">
+      <b>Desktop :</b> ZQSD / WASD ou ◀▲▼▶ pour marcher • <b>E / Espace</b> parler • <b>M</b> menu • souris : caméra • molette : zoom
+    </div>
+    <div class="legal">Projet de fan non affilié à Nintendo / Game Freak / Creatures Inc. Ne pas distribuer avec des ROMs ou assets Pokémon.</div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="quest">🎒 Parle au Prof. Odo au labo !</div>
+  <div id="partyMini"></div>
+  <div id="hint">E : interagir</div>
+  <div id="toast" class="hidden"></div>
+</div>
+
+<!-- Dialogue -->
+<div id="dialog" class="hidden">
+  <div id="dlgName">???</div>
+  <div id="dlgText"></div>
+  <div id="dlgNext">E / Clic ▸</div>
+</div>
+
+<!-- Choix starter -->
+<div id="starterPick" class="hidden panel">
+  <h2>Choisis ton compagnon</h2>
+  <p>Le Prof. Odo te confie un <b>Voltik</b> — comme dans Jaune, il te suivra partout ! (Les deux autres sont déjà réservés au rival.)</p>
+  <div class="starter-row">
+    <div class="starter-card locked"><div class="emoji">🌱</div><b>Verdibou</b><span>réservé</span></div>
+    <div class="starter-card pick" id="pickVoltik"><div class="emoji">⚡</div><b>Voltik</b><span>n°025-like • Souris Volt</span><button>Choisir Voltik !</button></div>
+    <div class="starter-card locked"><div class="emoji">🔥</div><b>Flamèche</b><span>réservé</span></div>
+  </div>
+</div>
+
+<!-- Menu -->
+<div id="menu" class="hidden">
+  <h3>MENU</h3>
+  <div id="menuTeam"></div>
+  <div class="menu-row">
+    <button id="btnDex">📖 Monstédex</button>
+    <button id="btnBag">🎒 Sac <span id="bagCount"></span></button>
+    <button id="btnHeal">💚 Soin (Centre)</button>
+    <button id="btnSave">💾 Sauvegarder</button>
+    <button id="btnCloseMenu">✖ Fermer (M)</button>
+  </div>
+  <div id="bagInfo"></div>
+</div>
+
+<!-- Monstédex -->
+<div id="dex" class="hidden">
+  <h3>📖 Monstédex — 18 espèces originales</h3>
+  <div id="dexGrid"></div>
+  <button id="btnCloseDex">Fermer</button>
+</div>
+
+<!-- Combat -->
+<div id="battle" class="hidden">
+  <div id="battleTop">
+    <div id="foeCard" class="bcard">
+      <div class="bname"><span id="foeName">???</span> <span id="foeLvl"></span></div>
+      <div class="hpbar"><div id="foeHp"></div></div>
+      <div id="foeHpTxt" class="hptxt"></div>
+    </div>
+    <div id="teamCard" class="bcard">
+      <div class="bname"><span id="teamName"></span> <span id="teamLvl"></span></div>
+      <div class="hpbar"><div id="teamHp"></div></div>
+      <div id="teamHpTxt" class="hptxt"></div>
+      <div id="teamXp" class="xpbar"><div id="teamXpFill"></div></div>
+    </div>
+  </div>
+  <div id="battleMsg"></div>
+  <div id="battleBtns">
+    <button data-act="fight">⚔️ Attaques</button>
+    <button data-act="orb">🟡 Orbe Capture <span id="orbCount"></span></button>
+    <button data-act="team">🔄 Équipe</button>
+    <button data-act="flee">🏃 Fuite</button>
+  </div>
+  <div id="moveBtns" class="hidden"></div>
+  <div id="teamBtns" class="hidden"></div>
+</div>
+
+<div id="loader"><div class="spin"></div><p>Chargement du monde 3D…</p></div>
+<div id="err" class="hidden"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
